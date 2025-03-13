@@ -193,7 +193,11 @@ int main()
 
                                     float* current_set = malloc(sizeof(float) * 6);
                                     memcpy(current_set, bruteforced_coefs, sizeof(float) * 6);
-                                    printf("%i %i %i\n", bruteforce_adjust_3, bruteforce_adjust_4, bruteforce_adjust_5);
+                                    printf("%i %i %i %i %i %i\n",
+                                        bruteforce_adjust_0, bruteforce_adjust_1, bruteforce_adjust_2,
+                                        bruteforce_adjust_3, bruteforce_adjust_4, bruteforce_adjust_5
+                                    );
+                                    
                                     int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_set);
                                     if (error_num) {
                                         printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
