@@ -152,8 +152,8 @@ void* bruteforce_thread_func(void* arg) {
 }
 
 #if 1
-#define BRUTEFORCE_LOOP(id, body) \
-    for (int bruteforce_adjust_##id = -10; bruteforce_adjust_##id <= 10; bruteforce_adjust_##id++) { \
+#define BRUTEFORCE_LOOP(id, lower_bound, upper_bound, body) \
+    for (int bruteforce_adjust_##id = lower_bound; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id++) { \
         int as_int_##id = BITCAST_F2I((exact_coefs[id])); \
         int bruteforced_##id = as_int_##id + bruteforce_adjust_##id; \
         float as_float_##id = BITCAST_I2F(bruteforced_##id); \
@@ -179,12 +179,12 @@ int main()
     for (int approx = 0; approx <= 0; approx++)
     {
         printf("fm_sinf_approx; approx level %i:\n", approx);
-        BRUTEFORCE_LOOP(0,
-            BRUTEFORCE_LOOP(1,
-                BRUTEFORCE_LOOP(2,
-                    BRUTEFORCE_LOOP(3,
-                        BRUTEFORCE_LOOP(4,
-                            BRUTEFORCE_LOOP(5,
+        BRUTEFORCE_LOOP(0, -10, 10,
+            BRUTEFORCE_LOOP(1, -10, 10,
+                BRUTEFORCE_LOOP(2, -10, 10,
+                    BRUTEFORCE_LOOP(3, -10, 10,
+                        BRUTEFORCE_LOOP(4, -10, 10,
+                            BRUTEFORCE_LOOP(5, -10, 10,
                                 {
                                     while (current_thread_count > MAX_THREADS)
                                     {
