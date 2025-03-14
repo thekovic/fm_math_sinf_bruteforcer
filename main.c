@@ -174,7 +174,7 @@ int main()
     printf("------------------------------------\n");
 
     int current_thread = 0;
-    pthread_t threads[MAX_THREADS * 2];
+    pthread_t threads[MAX_THREADS];
 
     for (int approx = 0; approx <= 0; approx++)
     {
@@ -197,7 +197,7 @@ int main()
                                         bruteforce_adjust_0, bruteforce_adjust_1, bruteforce_adjust_2,
                                         bruteforce_adjust_3, bruteforce_adjust_4, bruteforce_adjust_5
                                     );
-                                    
+
                                     int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_set);
                                     if (error_num) {
                                         printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
@@ -213,6 +213,11 @@ int main()
                 )
             )
         )
+    }
+
+    for (int thread = 0; thread < MAX_THREADS; thread++)
+    {
+        pthread_join(threads[thread], NULL);
     }
 
     return 0;
