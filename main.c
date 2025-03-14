@@ -101,6 +101,9 @@ void print_coefs(float* coefs)
     }
 }
 
+#define FLOAT_LIMIT_LOWER ((1 * M_PI) / 2.0f)
+#define FLOAT_LIMIT_UPPER ((-1 * M_PI) / 2.0f)
+
 void run_fm_sinf_over_all_f32s(float* tested_set)
 {
     int approx = 0;
@@ -111,7 +114,7 @@ void run_fm_sinf_over_all_f32s(float* tested_set)
     for (int64_t as_int = 0; as_int <= 0xffffffff; as_int++)
     {
         float as_float = BITCAST_I2F(as_int);
-        if ((as_float > (1 * M_PI)) || (as_float < (-1 * M_PI)))
+        if ((as_float > FLOAT_LIMIT_LOWER) || (as_float < FLOAT_LIMIT_UPPER))
         {
             continue;
         }
@@ -152,8 +155,8 @@ void* bruteforce_thread_func(void* arg) {
 }
 
 #if 1
-#define BRUTEFORCE_LOOP(id, lower_bound, upper_bound, body) \
-    for (int bruteforce_adjust_##id = lower_bound; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id++) { \
+#define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
+    for (int bruteforce_adjust_##id = lower_bound; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id += step) { \
         int as_int_##id = BITCAST_F2I((exact_coefs[id])); \
         int bruteforced_##id = as_int_##id + bruteforce_adjust_##id; \
         float as_float_##id = BITCAST_I2F(bruteforced_##id); \
@@ -179,12 +182,12 @@ int main()
     for (int approx = 0; approx <= 0; approx++)
     {
         printf("fm_sinf_approx; approx level %i:\n", approx);
-        BRUTEFORCE_LOOP(0, -10, 10,
-            BRUTEFORCE_LOOP(1, -10, 10,
-                BRUTEFORCE_LOOP(2, -10, 10,
-                    BRUTEFORCE_LOOP(3, -10, 10,
-                        BRUTEFORCE_LOOP(4, -10, 10,
-                            BRUTEFORCE_LOOP(5, -10, 10,
+        BRUTEFORCE_LOOP(0, 2, -10, 10,
+            BRUTEFORCE_LOOP(1, 2, -10, 10,
+                BRUTEFORCE_LOOP(2, 2, -10, 10,
+                    BRUTEFORCE_LOOP(3, 2, -10, 10,
+                        BRUTEFORCE_LOOP(4, 2, -10, 10,
+                            BRUTEFORCE_LOOP(5, 2, -10, 10,
                                 {
                                     while (current_thread_count > MAX_THREADS)
                                     {
