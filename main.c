@@ -7,6 +7,8 @@
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #define M_PI (3.14159265358979323846f)
 
@@ -92,19 +94,19 @@ float fm_atan2f(float y, float x) {
     return copysignf(r, y);
 }
 
-void print_coefs(float* coefs)
+void print_coefs(FILE* f, float* coefs)
 {
     for (int coef = 0; coef < POLYGON_COEFS; coef++)
     {
         int32_t as_int = BITCAST_F2I((coefs[coef]));
-        printf("coef %i: %.20f (0x%x) (%i)\n", coef, coefs[coef], as_int, as_int);
+        fprintf(f, "coef %i: %.20f [0x%x] (%i)\n", coef, coefs[coef], as_int, as_int);
     }
 }
 
 #define FLOAT_LIMIT_LOWER ((1 * M_PI) / 2.0f)
 #define FLOAT_LIMIT_UPPER ((-1 * M_PI) / 2.0f)
 
-void run_fm_sinf_over_all_f32s(float* tested_set)
+void run_fm_sinf_over_all_f32s(char* bruteforce_id, float* tested_set)
 {
     int approx = 0;
     int64_t out_of_bounds_errors = 0;
@@ -136,19 +138,28 @@ void run_fm_sinf_over_all_f32s(float* tested_set)
         }
     }
 
-    print_coefs(tested_set);    
-
-    //printf("Out of bounds errors: %li\n", out_of_bounds_errors);
-    printf("RMSD: %.20f\n", sqrt(result_diff_sum));
-    printf("maximum measured error: %.20f\n", max_measured_error);
-    printf("------------------------------------\n");
+    char filename[128] = "results/";
+    strcat(filename, bruteforce_id);
+    strcat(filename, ".txt");
+    FILE* f = fopen(filename, "w");
+    print_coefs(f, tested_set);    
+    fprintf(f, "RMSD: %.20f\nmaximum measured error: %.20f\n", sqrt(result_diff_sum), max_measured_error);
+    fclose(f);
 }
 
 static int current_thread_count = 0;
 
+typedef struct bruteforce_args_s
+{
+    float tested_set[6];
+    char bruteforce_id[64];
+} bruteforce_args_t;
+
 void* bruteforce_thread_func(void* arg) {
-    float* tested_set = (float*) arg;
-    run_fm_sinf_over_all_f32s(tested_set);
+    bruteforce_args_t* args = (bruteforce_args_t*) arg;
+
+    run_fm_sinf_over_all_f32s(args->bruteforce_id, args->tested_set);
+
     free(arg);
     current_thread_count--;
     return NULL;
@@ -156,7 +167,8 @@ void* bruteforce_thread_func(void* arg) {
 
 #if 1
 #define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
-    for (int bruteforce_adjust_##id = lower_bound; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id += step) { \
+    int lower_bound_##id = lower_bound; \
+    for (int bruteforce_adjust_##id = lower_bound_##id; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id += step) { \
         int as_int_##id = BITCAST_F2I((exact_coefs[id])); \
         int bruteforced_##id = as_int_##id + bruteforce_adjust_##id; \
         float as_float_##id = BITCAST_I2F(bruteforced_##id); \
@@ -169,11 +181,21 @@ void* bruteforce_thread_func(void* arg) {
 
 #define MAX_THREADS (10)
 
+#ifdef _WIN32
+    #define mkdir(a, b) _mkdir(a)
+#endif
+
 int main()
 {
+    // Create directory if it doesn't exist
+    if (mkdir("results", 0777) && errno != EEXIST) {
+        printf("mkdir failed");
+        return 1;
+    }
+
     float* tested_set = bruteforced_coefs;
     printf("Initial coefs:\n");
-    print_coefs(tested_set);
+    print_coefs(stdout, tested_set);
     printf("------------------------------------\n");
 
     int current_thread = 0;
@@ -194,14 +216,20 @@ int main()
                                         sleep(1);
                                     }
 
-                                    float* current_set = malloc(sizeof(float) * 6);
-                                    memcpy(current_set, bruteforced_coefs, sizeof(float) * 6);
-                                    printf("%i %i %i %i %i %i\n",
-                                        bruteforce_adjust_0, bruteforce_adjust_1, bruteforce_adjust_2,
-                                        bruteforce_adjust_3, bruteforce_adjust_4, bruteforce_adjust_5
+                                    bruteforce_args_t* current_args = malloc(sizeof(bruteforce_args_t));
+                                    memcpy(current_args->tested_set, bruteforced_coefs, sizeof(float) * 6);
+                                    snprintf(current_args->bruteforce_id, sizeof(current_args->bruteforce_id),
+                                        "%i_%i_%i_%i_%i_%i",
+                                        bruteforce_adjust_0 - lower_bound_0,
+                                        bruteforce_adjust_1 - lower_bound_1,
+                                        bruteforce_adjust_2 - lower_bound_2,
+                                        bruteforce_adjust_3 - lower_bound_3,
+                                        bruteforce_adjust_4 - lower_bound_4,
+                                        bruteforce_adjust_5 - lower_bound_5
                                     );
+                                    printf("%s\n", current_args->bruteforce_id);
 
-                                    int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_set);
+                                    int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_args);
                                     if (error_num) {
                                         printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
                                         return 1;
