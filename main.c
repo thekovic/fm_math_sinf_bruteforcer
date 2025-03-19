@@ -1,4 +1,6 @@
 #include "fmatha.h"
+#include "config.h"
+
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,44 +20,6 @@ static const float pi_hi            = 3.14159274e+00f; // 0x1.921fb6p+01
 static const float pi_lo            =-8.74227766e-08f; // -0x1.777a5cp-24
 static const float half_pi_hi       =  1.57079637e+0f; //  0x1.921fb6p+0
 static const float half_pi_lo       = -4.37113883e-8f; // -0x1.777a5cp-25
-
-#define POLYGON_COEFS (6)
-
-static const float original_coefs[POLYGON_COEFS] = {
-    - 1.01321176e-1f,
-    6.62087463e-3f,
-    - 1.73503853e-4f,
-    2.52223435e-6f,
-    - 2.33177868e-8f,
-    1.32729383e-10f
-};
-
-static const float exact_coefs[POLYGON_COEFS] = {
-    -0.101321183346709072589001712988183609230944236760490476f,
-    0.00662087952180793343258682906697112938547424931632185616f,
-    -0.000173505057912483501491115906801116298084629719204655552f,
-    2.52229235749396866288379170129828403876289663605034418e-6f,
-    -2.33177897192836082466066115718536782354224647348350113e-8f,
-    1.32913446369766718120324917415992976452154154051525892e-10f
-};
-
-static float bruteforced_coefs[POLYGON_COEFS] = {
-    -0.101321183346709072589001712988183609230944236760490476f,
-    0.00662087952180793343258682906697112938547424931632185616f,
-    -0.000173505057912483501491115906801116298084629719204655552f,
-    2.52229235749396866288379170129828403876289663605034418e-6f,
-    -2.33177897192836082466066115718536782354224647348350113e-8f,
-    1.32913446369766718120324917415992976452154154051525892e-10f
-};
-
-static const float best_found_coefs[POLYGON_COEFS] = {
-    -0.10132116824388504028f,
-    0.00662088021636009216f,
-    -0.00017350520647596568f,
-    0.00000252229006036941f,
-    -0.00000002331780812881f,
-    0.00000000013291330536f
-};
 
 __attribute__((noinline))
 static float sinf_approx(float x, int approx, float* tested_set) {
@@ -105,7 +69,7 @@ float fm_atan2f(float y, float x) {
 
 void print_coefs(FILE* f, float* coefs)
 {
-    for (int coef = 0; coef < POLYGON_COEFS; coef++)
+    for (int coef = 0; coef < POLYNOM_COEFS; coef++)
     {
         int32_t as_int = BITCAST_F2I((coefs[coef]));
         fprintf(f, "coef %i: %.20f [0x%x] (%i)\n", coef, coefs[coef], as_int, as_int);
@@ -159,7 +123,6 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
     strcat(filename, bruteforce_id);
     strcat(filename, ".txt");
 
-#define SAVE_TO_FILE 1
 #if SAVE_TO_FILE == 1
     FILE* f = fopen(filename, "w");
 #else
@@ -193,28 +156,6 @@ void* bruteforce_thread_func(void* arg) {
     return NULL;
 }
 
-#if 1
-#define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
-    int lower_bound_##id = lower_bound; \
-    for (int bruteforce_adjust_##id = lower_bound_##id; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id += step) { \
-        int32_t as_int_##id = BITCAST_F2I((exact_coefs[id])); \
-        int bruteforced_##id = as_int_##id + bruteforce_adjust_##id; \
-        float as_float_##id = BITCAST_I2F(bruteforced_##id); \
-        bruteforced_coefs[id] = as_float_##id; \
-        body \
-    }
-#else
-#define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
-{ \
-    int lower_bound_##id = lower_bound; \
-    int bruteforce_adjust_##id = lower_bound_##id; \
-    body \
-}
-#endif
-
-#define MULTITHREADED 1
-#define MAX_THREADS (10)
-
 #ifdef _WIN32
     #define mkdir(a, b) _mkdir(a)
 #endif
@@ -227,7 +168,6 @@ int main()
         return 1;
     }
 
-    float* tested_set = bruteforced_coefs;
     printf("Initial coefs:\n");
     print_coefs(stdout, tested_set);
     printf("------------------------------------\n");
@@ -238,52 +178,41 @@ int main()
     for (int approx = 0; approx <= 0; approx++)
     {
         printf("fm_sinf_approx; approx level %i:\n", approx);
-        BRUTEFORCE_LOOP(0, 2, -10, 10,
-            BRUTEFORCE_LOOP(1, 2, -10, 10,
-                BRUTEFORCE_LOOP(2, 2, -10, 10,
-                    BRUTEFORCE_LOOP(3, 2, -10, 10,
-                        BRUTEFORCE_LOOP(4, 2, -10, 10,
-                            BRUTEFORCE_LOOP(5, 2, -10, 10,
-                                {
+        RUN_BRUTEFORCE(
+        {
 #if MULTITHREADED == 1
-                                    while (current_thread_count > MAX_THREADS)
-                                    {
-                                        sleep(1);
-                                    }
+            while (current_thread_count > MAX_THREADS)
+            {
+                sleep(1);
+            }
 #endif
-
-                                    bruteforce_args_t* current_args = malloc(sizeof(bruteforce_args_t));
-                                    current_args->approx = approx;
-                                    memcpy(current_args->tested_set, tested_set, sizeof(float) * 6);
-                                    snprintf(current_args->bruteforce_id, sizeof(current_args->bruteforce_id),
-                                        "%i_%i_%i_%i_%i_%i",
-                                        bruteforce_adjust_0 - lower_bound_0,
-                                        bruteforce_adjust_1 - lower_bound_1,
-                                        bruteforce_adjust_2 - lower_bound_2,
-                                        bruteforce_adjust_3 - lower_bound_3,
-                                        bruteforce_adjust_4 - lower_bound_4,
-                                        bruteforce_adjust_5 - lower_bound_5
-                                    );
-                                    printf("%s\n", current_args->bruteforce_id);
+            bruteforce_args_t* current_args = malloc(sizeof(bruteforce_args_t));
+            current_args->approx = approx;
+            memcpy(current_args->tested_set, tested_set, sizeof(float) * 6);
+            snprintf(current_args->bruteforce_id, sizeof(current_args->bruteforce_id),
+                "%i_%i_%i_%i_%i_%i",
+                bruteforce_adjust_0 - lower_bound_0,
+                bruteforce_adjust_1 - lower_bound_1,
+                bruteforce_adjust_2 - lower_bound_2,
+                bruteforce_adjust_3 - lower_bound_3,
+                bruteforce_adjust_4 - lower_bound_4,
+                bruteforce_adjust_5 - lower_bound_5
+            );
+            printf("%s\n", current_args->bruteforce_id);
 #if MULTITHREADED == 1
-                                    int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_args);
-                                    if (error_num) {
-                                        printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
-                                        return 1;
-                                    }
+            int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_args);
+            if (error_num)
+            {
+                printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
+                return 1;
+            }
 
-                                    current_thread_count++;
-                                    current_thread++;
+            current_thread_count++;
+            current_thread++;
 #else
-                                    bruteforce_thread_func(current_args);
+            bruteforce_thread_func(current_args);
 #endif
-                                }
-                            )
-                        )
-                    )
-                )
-            )
-        )
+        })
     }
 
 #if MULTITHREADED == 1
