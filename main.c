@@ -177,7 +177,12 @@ void* bruteforce_thread_func(void* arg) {
         body \
     }
 #else
-#define BRUTEFORCE_LOOP(id, body) { body }
+#define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
+{ \
+    int lower_bound_##id = lower_bound; \
+    int bruteforce_adjust_##id = lower_bound_##id; \
+    body \
+}
 #endif
 
 #define MAX_THREADS (10)
