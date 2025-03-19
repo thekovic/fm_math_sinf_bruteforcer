@@ -138,11 +138,15 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
             return;
         }
 
-        int64_t result_as_int = BITCAST_F2I(result);
-        int64_t std_result_as_int = BITCAST_F2I(std_result);
-        int64_t diff_abs_as_int = abs(result_as_int - std_result_as_int);
-        max_measured_error_as_int = (diff_abs_as_int > max_measured_error_as_int) ? diff_abs_as_int : max_measured_error_as_int;
-
+        int32_t result_as_int = BITCAST_F2I(result);
+        // Ignore imprecision around +/- 0 at extremely small scale (< 1e-32).
+        if (result_as_int != 0 && result_as_int != 0x80000000)
+        {
+            int32_t std_result_as_int = BITCAST_F2I(std_result);
+            int64_t diff_abs_as_int = abs(result_as_int - std_result_as_int);
+            max_measured_error_as_int = (diff_abs_as_int > max_measured_error_as_int) ? diff_abs_as_int : max_measured_error_as_int;
+        }
+        
         float diff = result - std_result;
         double diff_abs = fabs(diff);
         max_measured_error = (diff_abs > max_measured_error) ? diff_abs : max_measured_error;
@@ -164,7 +168,7 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
     print_coefs(f, tested_set);    
     fprintf(f, "RMSD: %.20f\n", sqrt(result_diff_sum));
     fprintf(f, "maximum measured error: %.20f\n", max_measured_error);
-    fprintf(f, "maximum measured error (int): %li\n",max_measured_error_as_int);
+    fprintf(f, "maximum measured error (int): %i\n",max_measured_error_as_int);
 #if SAVE_TO_FILE == 1
     fclose(f);
 #endif
@@ -193,7 +197,7 @@ void* bruteforce_thread_func(void* arg) {
 #define BRUTEFORCE_LOOP(id, step, lower_bound, upper_bound, body) \
     int lower_bound_##id = lower_bound; \
     for (int bruteforce_adjust_##id = lower_bound_##id; bruteforce_adjust_##id <= upper_bound; bruteforce_adjust_##id += step) { \
-        int as_int_##id = BITCAST_F2I((exact_coefs[id])); \
+        int32_t as_int_##id = BITCAST_F2I((exact_coefs[id])); \
         int bruteforced_##id = as_int_##id + bruteforce_adjust_##id; \
         float as_float_##id = BITCAST_I2F(bruteforced_##id); \
         bruteforced_coefs[id] = as_float_##id; \
