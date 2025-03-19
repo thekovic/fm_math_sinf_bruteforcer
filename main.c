@@ -106,7 +106,7 @@ void print_coefs(FILE* f, float* coefs)
 #define FLOAT_LIMIT_LOWER ((1 * M_PI) / 2.0f)
 #define FLOAT_LIMIT_UPPER ((-1 * M_PI) / 2.0f)
 
-void run_fm_sinf_over_all_f32s(char* bruteforce_id, float* tested_set)
+void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_set)
 {
     int approx = 0;
     int64_t out_of_bounds_errors = 0;
@@ -151,6 +151,7 @@ static int current_thread_count = 0;
 
 typedef struct bruteforce_args_s
 {
+    int approx;
     float tested_set[6];
     char bruteforce_id[64];
 } bruteforce_args_t;
@@ -158,7 +159,7 @@ typedef struct bruteforce_args_s
 void* bruteforce_thread_func(void* arg) {
     bruteforce_args_t* args = (bruteforce_args_t*) arg;
 
-    run_fm_sinf_over_all_f32s(args->bruteforce_id, args->tested_set);
+    run_fm_sinf_over_all_f32s(args->approx, args->bruteforce_id, args->tested_set);
 
     free(arg);
     current_thread_count--;
@@ -217,7 +218,8 @@ int main()
                                     }
 
                                     bruteforce_args_t* current_args = malloc(sizeof(bruteforce_args_t));
-                                    memcpy(current_args->tested_set, bruteforced_coefs, sizeof(float) * 6);
+                                    current_args->approx = approx;
+                                    memcpy(current_args->tested_set, tested_set, sizeof(float) * 6);
                                     snprintf(current_args->bruteforce_id, sizeof(current_args->bruteforce_id),
                                         "%i_%i_%i_%i_%i_%i",
                                         bruteforce_adjust_0 - lower_bound_0,
