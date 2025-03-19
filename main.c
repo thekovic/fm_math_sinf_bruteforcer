@@ -141,10 +141,18 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
     char filename[128] = "results/";
     strcat(filename, bruteforce_id);
     strcat(filename, ".txt");
+
+#define SAVE_TO_FILE 1
+#if SAVE_TO_FILE == 1
     FILE* f = fopen(filename, "w");
+#else
+    FILE* f = stdout;
+#endif
     print_coefs(f, tested_set);    
     fprintf(f, "RMSD: %.20f\nmaximum measured error: %.20f\n", sqrt(result_diff_sum), max_measured_error);
+#if SAVE_TO_FILE == 1
     fclose(f);
+#endif
 }
 
 static int current_thread_count = 0;
