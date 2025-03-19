@@ -48,6 +48,15 @@ static float bruteforced_coefs[POLYGON_COEFS] = {
     1.32913446369766718120324917415992976452154154051525892e-10f
 };
 
+static const float best_found_coefs[POLYGON_COEFS] = {
+    -0.10132116824388504028f,
+    0.00662088021636009216f,
+    -0.00017350520647596568f,
+    0.00000252229006036941f,
+    -0.00000002331780812881f,
+    0.00000000013291330536f
+};
+
 __attribute__((noinline))
 static float sinf_approx(float x, int approx, float* tested_set) {
     // Approximation of sine to 5 ULP with Chebyshev polynomials
@@ -108,10 +117,9 @@ void print_coefs(FILE* f, float* coefs)
 
 void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_set)
 {
-    int approx = 0;
-    int64_t out_of_bounds_errors = 0;
     double result_diff_sum = 0;
     double max_measured_error = 0;
+    int max_measured_error_as_int = 0;
 
     for (int64_t as_int = 0; as_int <= 0xffffffff; as_int++)
     {
@@ -123,19 +131,24 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
         
         float result = fm_sinf_approx(as_float, approx, tested_set);
         float std_result = sinf(as_float);
-        float diff = result - std_result;
 
+        if (result > 1.0f || result < -1.0f)
+        {
+            //printf("abort %.20f vs %.20f\n", result, std_result);
+            return;
+        }
+
+        int64_t result_as_int = BITCAST_F2I(result);
+        int64_t std_result_as_int = BITCAST_F2I(std_result);
+        int64_t diff_abs_as_int = abs(result_as_int - std_result_as_int);
+        max_measured_error_as_int = (diff_abs_as_int > max_measured_error_as_int) ? diff_abs_as_int : max_measured_error_as_int;
+
+        float diff = result - std_result;
         double diff_abs = fabs(diff);
         max_measured_error = (diff_abs > max_measured_error) ? diff_abs : max_measured_error;
 
         float diff_squared = diff * diff;
         result_diff_sum += diff_squared;
-
-        if (result > 1.0f || result < -1.0f)
-        {
-            //out_of_bounds_errors++;
-            return;
-        }
     }
 
     char filename[128] = "results/";
@@ -149,7 +162,9 @@ void run_fm_sinf_over_all_f32s(int approx, char* bruteforce_id, float* tested_se
     FILE* f = stdout;
 #endif
     print_coefs(f, tested_set);    
-    fprintf(f, "RMSD: %.20f\nmaximum measured error: %.20f\n", sqrt(result_diff_sum), max_measured_error);
+    fprintf(f, "RMSD: %.20f\n", sqrt(result_diff_sum));
+    fprintf(f, "maximum measured error: %.20f\n", max_measured_error);
+    fprintf(f, "maximum measured error (int): %li\n",max_measured_error_as_int);
 #if SAVE_TO_FILE == 1
     fclose(f);
 #endif
