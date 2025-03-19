@@ -212,7 +212,7 @@ void* bruteforce_thread_func(void* arg) {
 }
 #endif
 
-#define MULTITHREADED 0
+#define MULTITHREADED 1
 #define MAX_THREADS (10)
 
 #ifdef _WIN32
