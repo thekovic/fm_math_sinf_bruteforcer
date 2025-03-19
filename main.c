@@ -185,6 +185,7 @@ void* bruteforce_thread_func(void* arg) {
 }
 #endif
 
+#define MULTITHREADED 0
 #define MAX_THREADS (10)
 
 #ifdef _WIN32
@@ -217,10 +218,12 @@ int main()
                         BRUTEFORCE_LOOP(4, 2, -10, 10,
                             BRUTEFORCE_LOOP(5, 2, -10, 10,
                                 {
+#if MULTITHREADED == 1
                                     while (current_thread_count > MAX_THREADS)
                                     {
                                         sleep(1);
                                     }
+#endif
 
                                     bruteforce_args_t* current_args = malloc(sizeof(bruteforce_args_t));
                                     current_args->approx = approx;
@@ -235,7 +238,7 @@ int main()
                                         bruteforce_adjust_5 - lower_bound_5
                                     );
                                     printf("%s\n", current_args->bruteforce_id);
-
+#if MULTITHREADED == 1
                                     int error_num = pthread_create(&threads[current_thread % MAX_THREADS], NULL, bruteforce_thread_func, current_args);
                                     if (error_num) {
                                         printf("Failed to create thread %i with error code %i\n", current_thread, error_num);
@@ -244,6 +247,9 @@ int main()
 
                                     current_thread_count++;
                                     current_thread++;
+#else
+                                    bruteforce_thread_func(current_args);
+#endif
                                 }
                             )
                         )
@@ -253,10 +259,15 @@ int main()
         )
     }
 
+#if MULTITHREADED == 1
+    printf("Ran out of threads.\n");
     for (int thread = 0; thread < MAX_THREADS; thread++)
     {
         pthread_join(threads[thread], NULL);
     }
+#endif
+
+    printf("Finished.\n");
 
     return 0;
 }
