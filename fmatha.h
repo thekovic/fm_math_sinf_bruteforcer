@@ -1,3 +1,6 @@
+// Libdragon API shim. Adapted from: https://github.com/DragonMinded/libdragon/blob/preview/include/fmath.h
+// Used under the terms of the libdragon project's Unlicense license.
+
 /**
  * @file fmath.h
  * @brief Fast math routines, optimized for 3D graphics calculations
